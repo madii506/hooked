@@ -2,7 +2,9 @@
 // plus a chain check of how many of them carry a transfer hook (read with getMultipleAccounts, jsonParsed).
 const { rpc, jup, T22 } = require('./_rpc');
 const pick = t => ({
-  mint: t.id, name: String(t.name || '').slice(0, 40), symbol: String(t.symbol || '').slice(0, 14), icon: t.icon || null,
+  mint: t.id, name: String(t.name || '').slice(0, 40), symbol: String(t.symbol || '').slice(0, 14),
+  // pump.fun's own image CDN has every coin's picture (Jupiter's ipfs.io links often fail); Jupiter's link stays as a fallback
+  icon: 'https://images.pump.fun/coin-image/' + t.id + '?variant=86x86', alt: t.icon && !/ipfs\.io\//.test(t.icon) ? t.icon : null,
   mcap: t.mcap ?? null, ch5m: t.stats5m?.priceChange ?? null, ch1h: t.stats1h?.priceChange ?? null,
   holders: t.holderCount ?? null, born: Date.parse(t.firstPool?.createdAt || t.createdAt || '') || null, bonded: !!t.graduatedPool, t22: t.tokenProgram === T22,
 });
