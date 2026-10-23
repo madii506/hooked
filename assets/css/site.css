@@ -98,7 +98,7 @@ h2 em { font-style: normal; color: var(--mute); }
 
 /* 01 promises vs rules */
 .vs { display: grid; grid-template-columns: 1fr 70px 1fr; gap: 10px; margin-top: 40px; align-items: stretch; }
-.vs-col { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+.vs-col { min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
 .vs-k { font: 700 11px var(--m); letter-spacing: .18em; color: var(--mute); margin-bottom: 14px; }
 .vs ul { list-style: none; }
 .vs li { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 13px 0; border-bottom: 1px dashed var(--line); font-size: 15px; }
@@ -113,7 +113,7 @@ h2 em { font-style: normal; color: var(--mute); }
 .enforced i { color: var(--ok) !important; }
 .vs-mid { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font: 800 22px var(--m); }
 .vs-mid span { flex: 1; width: 1px; background: var(--line2); }
-@media (max-width: 860px) { .vs { grid-template-columns: 1fr; } .vs-mid { flex-direction: row; } .vs-mid span { height: 1px; width: auto; } .vs-mid b { transform: rotate(90deg); } }
+@media (max-width: 860px) { .vs li { flex-direction: column; gap: 4px; } .vs li i { white-space: normal; } .vs { grid-template-columns: 1fr; } .vs-mid { flex-direction: row; } .vs-mid span { height: 1px; width: auto; } .vs-mid b { transform: rotate(90deg); } }
 
 /* 02 pipeline + code */
 .pipe { margin: 44px 0 18px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 10px; }
