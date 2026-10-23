@@ -28,13 +28,12 @@ function camAt(K, t) {
   return K[K.length - 1][1];
 }
 function runIntro() {
-  const bar = $('.i-line i'), T0 = performance.now(), END = 11.2, R = 13, o = (a, y = 1) => [Math.sin(a) * R, y, Math.cos(a) * R];
+  const bar = $('.i-line i'), T0 = performance.now(), END = 8.9, R = 13, o = (a, y = 1) => [Math.sin(a) * R, y, Math.cos(a) * R];
   const K = [
     [0.0, [0, 8.5, 32, 0, -2, 0]], [1.95, [0, 3.0, 23.5, 0, -.3, 0]],         // the sea draws in, wide and high; the hook lowers into view
     [2.7, [0, .7, 16.5, 0, -2.5, 0]], [4.05, [-2.6, .05, 13.5, 0, -2.9, 0]],   // down at the waterline as the hook goes in; the coin rises below
     [4.75, [0, 1.9, 17.5, 0, .75, 0]],                                           // the strike: look up with it
     [5.9, [...o(.62, 1.2), 0, -.2, 0]], [6.9, [...o(-.42, .5), 0, -.3, 0]],     // around the catch
-    [7.6, [1.05, -.08, 5.5, 0, -.22, 0]], [8.6, [.65, -.12, 5.0, 0, -.22, 0]],  // the rule on the coin
     [END - .3, [HERO_X, .9, 18.5, HERO_X, 1.05, 0]],
   ];
   const ev = new Set(), once = (k, t, at, fn) => { if (t >= at && !ev.has(k)) { ev.add(k); fn(); } };
@@ -62,11 +61,11 @@ function runIntro() {
     S.hookY = y;
     // the coin comes up to the hook under the water, then rides it out
     S.coinDrop = (-11 - y + .2) * (t < 2.7 ? 1 : 1 - ease((t - 2.7) / 1.05));   // from deep water up to the bend
-    S.coinHide = t < 2.7; S.spin = t > 7.7 && t < 8.5 ? Math.PI * 2 * smooth((t - 7.7) / .8) : 0;
+    S.coinHide = t < 2.7;
     once('bite1', t, 3.62, () => stage.drip(1.0, 0, .1)); once('bite2', t, 3.98, () => stage.drip(1.0, 0, .14));
     once('kick', t, 4.5, () => { S.pendV = -1.25; });
     [5.2, 5.75, 6.3, 6.85].forEach((at, i) => once('d' + i, t, at, () => { const w = stage.coinWorld(); w.y -= .55; stage.dropFrom(w); }));
-    once('ring', t, 8.45, () => { stage.drip(0, 0, .4); stage.pulse(); });
+    once('ring', t, 7.0, () => { stage.drip(0, 0, .4); stage.pulse(); });
     if (t > END) return finish();
     requestAnimationFrame(step);
   };
