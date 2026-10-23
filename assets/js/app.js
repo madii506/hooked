@@ -1,6 +1,7 @@
 // hooked: the page. Intro, hero labels, the pipeline, rule cards, the simulator, the live inspector, the launch rulebook.
-import { createStage } from './scene.js';
-import { initFx } from './fx.js';
+import { createStage } from './scene.js?v=5';
+import { initFx } from './fx.js?v=5';
+import { initBg } from './bg.js?v=5';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const html = document.documentElement, mob = innerWidth < 900;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -12,10 +13,11 @@ const usd = v => v == null ? '—' : v >= 1e9 ? '$' + (v / 1e9).toFixed(2) + 'B'
 // ---------- the stage and the intro ----------
 const HERO_X = mob ? 0 : -3.9;
 const intro = html.classList.contains('intro');
-const stage = createStage($('#stage'), intro ? { hookY: 14, coinDrop: 40, seaOn: 0, camTarget: HERO_X, camX: HERO_X, camPath: [0, 9, 34, 0, -1.5, 0] } : { camTarget: HERO_X, camX: HERO_X, autoDrip: true });
+const stage = createStage($('#stage'), intro ? { hookY: 16, coinDrop: -27, reveal: 0, camTarget: HERO_X, camX: HERO_X, camPath: [0, 8.5, 32, 0, -2, 0] } : { camTarget: HERO_X, camX: HERO_X, autoDrip: true });
 const S = stage.S;
-// the intro: no words. The sea draws in, a line drops, the hook lowers on it, the camera circles it,
-// a coin falls into the bend, the camera looks closely at the rule stamped on it, then pulls back to the page.
+// the intro: no words, one catch. The water draws itself in, the line drops the hook straight through the surface,
+// the coin rises to it under the water, two bites, the strike pulls it out in a burst of spray, it swings and drips,
+// the camera looks closely at the rule on the coin, a ring runs across the whole sea, and the camera pulls back to the page.
 const smooth = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k);
 function camAt(K, t) {
   if (t <= K[0][0]) return K[0][1];
@@ -23,16 +25,20 @@ function camAt(K, t) {
   return K[K.length - 1][1];
 }
 function runIntro() {
-  const bar = $('.i-line i'), T0 = performance.now(), END = 10.4, R = 18.5, o = a => [Math.sin(a) * R, 1.2 + Math.abs(Math.sin(a)) * 1.6, Math.cos(a) * R];
+  const bar = $('.i-line i'), T0 = performance.now(), END = 11.2, R = 13, o = (a, y = 1) => [Math.sin(a) * R, y, Math.cos(a) * R];
   const K = [
-    [0.0, [0, 9, 34, 0, -1.5, 0]], [1.8, [0, 3.4, 26, 0, .4, 0]], [3.9, [0, 1.4, 19.5, 0, .9, 0]],
-    [5.0, [...o(.75), 0, .7, 0]], [6.0, [...o(-.45), 0, .5, 0]],
-    [7.1, [1.1, -.05, 5.6, 0, -.22, 0]], [7.9, [.7, -.1, 5.2, 0, -.22, 0]],
-    [END - .4, [HERO_X, .9, 18.5, HERO_X, 1.05, 0]],
+    [0.0, [0, 8.5, 32, 0, -2, 0]], [1.95, [0, 3.0, 23.5, 0, -.3, 0]],         // the sea draws in, wide and high; the hook lowers into view
+    [2.7, [0, .7, 16.5, 0, -2.5, 0]], [4.05, [-2.6, .05, 13.5, 0, -2.9, 0]],   // down at the waterline as the hook goes in; the coin rises below
+    [4.75, [0, 1.9, 17.5, 0, .75, 0]],                                           // the strike: look up with it
+    [5.9, [...o(.62, 1.2), 0, -.2, 0]], [6.9, [...o(-.42, .5), 0, -.3, 0]],     // around the catch
+    [7.6, [1.05, -.08, 5.5, 0, -.22, 0]], [8.6, [.65, -.12, 5.0, 0, -.22, 0]],  // the rule on the coin
+    [END - .3, [HERO_X, .9, 18.5, HERO_X, 1.05, 0]],
   ];
-  let done = false, dripped = false, d2 = false, d3 = false;
+  const ev = new Set(), once = (k, t, at, fn) => { if (t >= at && !ev.has(k)) { ev.add(k); fn(); } };
+  const gauss = (t, c, w) => Math.exp(-(((t - c) / w) ** 2));
+  let done = false;
   const finish = () => {
-    if (done) return; done = true; S.camPath = null; S.camX = HERO_X; S.hookY = 0; S.coinDrop = 0; S.seaOn = 1; S.camTarget = HERO_X; S.lookY = S.lookYs = 1.05; S.autoDrip = true;
+    if (done) return; done = true; S.camPath = null; S.camX = HERO_X; S.hookY = 0; S.coinDrop = 0; S.reveal = 999; S.spin = 0; S.coinHide = false; S.camTarget = HERO_X; S.lookY = S.lookYs = 1.05; S.autoDrip = true;
     $('#intro').classList.add('out'); html.classList.remove('intro'); setTimeout(() => $('#intro').remove(), 900);
     setTimeout(() => $$('.tag').forEach(t => t.classList.add('on')), 900); setTimeout(() => FX.revealHero(), 250);
   };
@@ -41,18 +47,29 @@ function runIntro() {
     if (done) return; const t = (performance.now() - T0) / 1000;
     bar.style.transform = `scaleX(${Math.min(1, t / END)})`;
     S.camPath = camAt(K, t);
-    S.seaOn = ease(t / 2.2);
-    S.hookY = 14 * (1 - back((t - 1.6) / 2.4));
-    S.coinDrop = t < 5.1 ? 40 : 7 * (1 - easeIn((t - 5.1) / .62)) + (t > 5.72 ? -.07 * Math.sin((t - 5.72) * 14) * Math.exp(-(t - 5.72) * 5) : 0);
-    if (!d2 && t > 3.9) { d2 = true; stage.drip(0, 0, .12); }
-    if (!dripped && t > 5.72) { dripped = true; stage.drip(0, 0, .34); }
-    if (!d3 && t > 8.6) { d3 = true; stage.drip(0, 0, .18); }
+    S.reveal = t < 2.7 ? 72 * Math.pow(Math.min(1, t / 2.7), 1.6) : 999;
+    // the hook: falls through the surface, bobs, two bites, the strike, then settles into place
+    let y;
+    if (t < .9) y = 12;
+    else if (t < 2.15) y = 12 - 8.8 * ease((t - .9) / 1.0) + .12 * Math.sin((t - .9) * 5) * smooth((t - 1.6) / .4);
+    else if (t < 2.62) { const k = (t - 2.15) / .47; y = 3.2 - 7.4 * k * k; }
+    else if (t < 4.3) y = -4.2 - .3 * Math.sin((t - 2.62) * 7) * Math.exp(-(t - 2.62) * 2.6) - .3 * gauss(t, 3.62, .05) - .45 * gauss(t, 3.98, .05);
+    else if (t < 4.72) y = -4.2 + 5.1 * ease((t - 4.3) / .42);
+    else y = .9 * (1 - back((t - 4.72) / 1.5));
+    S.hookY = y;
+    // the coin comes up to the hook under the water, then rides it out
+    S.coinDrop = (-11 - y + .2) * (t < 2.7 ? 1 : 1 - ease((t - 2.7) / 1.05));   // from deep water up to the bend
+    S.coinHide = t < 2.7; S.spin = t > 7.7 && t < 8.5 ? Math.PI * 2 * smooth((t - 7.7) / .8) : 0;
+    once('bite1', t, 3.62, () => stage.drip(1.0, 0, .1)); once('bite2', t, 3.98, () => stage.drip(1.0, 0, .14));
+    once('kick', t, 4.5, () => { S.pendV = -1.25; });
+    [5.2, 5.75, 6.3, 6.85].forEach((at, i) => once('d' + i, t, at, () => { const w = stage.coinWorld(); w.y -= .55; stage.dropFrom(w); }));
+    once('ring', t, 8.45, () => { stage.drip(0, 0, .4); stage.pulse(); });
     if (t > END) return finish();
     requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
-const FX = initFx(stage);
+const FX = initFx(stage); const BG = initBg();
 if (intro) runIntro(); else { $$('.tag').forEach(t => t.classList.add('on')); FX.revealHero(); }
 
 // hero labels with leader lines, pinned to the 3D hook
@@ -351,4 +368,43 @@ $$('#examples button').forEach(b => b.onclick = () => inspect(b.dataset.m));
     x.setTransform(d, 0, 0, d, 0, 0); const W = r.width, H = r.height; x.clearRect(0, 0, W, H); const t = now / 1000;
     for (let i = 0; i < 9; i++) { const k = ((t * .12 + i / 9) % 1), rr = 40 + k * Math.max(W, H) * .7; x.strokeStyle = `rgba(17,17,17,${.28 * (1 - k)})`; x.lineWidth = 1; x.beginPath(); x.ellipse(W / 2, H / 2, rr, rr * .32, 0, 0, 7); x.stroke(); } }
   requestAnimationFrame(f);
+})();
+
+// ---------- the ticker: real pump.fun coins right now (trending + just launched), checked on-chain for a transfer hook ----------
+(function ticker() {
+  const box = $('#tick'); if (!box) return;
+  const rows = $$('#tick .tk-row').map((r, i) => ({ el: r, k: r.dataset.k, tr: r.querySelector('.tk-track'), off: 0, w: 0, dir: i ? 1 : -1, hov: false, sp: 1, items: [] }));
+  const pct = v => v == null ? '' : `<span class="ch ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '▲' : '▼'} ${Math.abs(v) >= 100 ? Math.round(Math.abs(v)) : Math.abs(v).toFixed(1)}%</span>`;
+  const ago = ms => { const s = Math.max(1, Math.round(ms / 1000)); return s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : s < 86400 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd'; };
+  const chip = (t, fresh) => `<a class="tc" href="https://pump.fun/coin/${encodeURIComponent(t.mint)}" target="_blank" rel="noopener" title="${esc(t.name)} on pump.fun">`
+    + (t.icon ? `<img src="${esc(t.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'ph',textContent:'${esc((t.symbol || '?')[0].toUpperCase())}'}))">` : `<i class="ph">${esc((t.symbol || '?')[0].toUpperCase())}</i>`)
+    + `<span class="nm">${esc(t.name)}</span><span class="sy">$${esc(t.symbol)}</span>`
+    + `<span class="mc">${t.mcap ? usd(t.mcap) : 'new'}</span>`
+    + (fresh ? `<span class="ag" data-born="${t.born || ''}">${t.born ? ago(Date.now() - t.born) : ''}</span>` : pct(t.ch1h ?? t.ch5m))
+    + `<span class="hk ${t.hook ? 'on' : ''}">${t.hook ? 'hook' : t.t22 ? 't22 · no hook' : 'spl'}</span></a>`;
+  function fill(R, list) {
+    if (R.hov) { R.pending = list; return; }
+    if (!list.length) { R.tr.innerHTML = `<span class="tk-empty">nothing in the feed right now</span>`; R.w = 0; return; }
+    const one = list.map(t => chip(t, R.k === 'fresh')).join(''); R.tr.innerHTML = one; const vw = R.el.querySelector('.tk-vp').offsetWidth || innerWidth;
+    const w1 = R.tr.scrollWidth; let reps = 1; while ((reps < 2 || R.tr.scrollWidth < vw + w1) && reps < 10) { R.tr.insertAdjacentHTML('beforeend', one); reps++; }
+    R.w = (R.tr.scrollWidth + 8) / reps; R.off = R.off % (R.w || 1); R.reps = reps;
+  }
+  let lastAt = 0;
+  async function load() {
+    try {
+      const d = await fetch('/api/pump').then(r => r.json()); if (!d.ok) throw new Error(d.error || 'feed offline');
+      fill(rows[0], d.trending || []); fill(rows[1], d.fresh || []); lastAt = d.at || Date.now();
+      const all = [...(d.trending || []), ...(d.fresh || [])], t22 = all.filter(t => t.t22).length;
+      $('#tkStat').innerHTML = d.hooks == null ? `${all.length} live coins · on-chain check offline right now`
+        : `<b>${d.checked}</b> live coins read on-chain · <b>${t22}</b> already Token-2022 · <b class="z">${d.hooks}</b> with a transfer hook`;
+    } catch (e) { $('#tkStat').textContent = 'pump.fun feed offline right now · ' + String(e.message || e).slice(0, 80); }
+  }
+  load(); setInterval(() => { if (!document.hidden) load(); }, 30000);
+  setInterval(() => { if (lastAt) $('#tkAt').textContent = 'updated ' + ago(Date.now() - lastAt) + ' ago'; $$('#tick .ag').forEach(a => { const b = +a.dataset.born; if (b) a.textContent = ago(Date.now() - b); }); }, 1000);
+  rows.forEach(R => { const vp = R.el.querySelector('.tk-vp'); vp.addEventListener('pointerenter', () => { R.hov = true; }); vp.addEventListener('pointerleave', () => { R.hov = false; if (R.pending) { const p = R.pending; R.pending = null; fill(R, p); } }); });
+  let lastY = scrollY, v = 0, prev = performance.now(), vis = true; new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(box);
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (function f(now) { requestAnimationFrame(f); const dt = Math.min(.05, (now - prev) / 1000); prev = now; const dy = scrollY - lastY; lastY = scrollY; v += (dy - v) * .1; if (!vis || RM) return;
+    rows.forEach(R => { if (!R.w) return; R.sp += ((R.hov ? 0 : 1) - R.sp) * Math.min(1, dt * 4); R.off += R.dir * R.sp * (38 + Math.min(600, Math.abs(v) * 22)) * dt;
+      const o = ((R.off % R.w) + R.w) % R.w; R.tr.style.transform = `translate3d(${-o}px,0,0)`; }); })(prev);
 })();

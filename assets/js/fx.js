@@ -129,6 +129,6 @@ export function initFx(stage) {
     if (e.target.matches('h2, h1')) e.target.classList.add('shown');
     else { e.target.classList.add('drawn'); e.target.querySelectorAll('.lbl').forEach(l => scramble(l)); } }), { threshold: .2 });
   $$('h2').forEach(h => io.observe(h)); $$('.hd').forEach(h => { const s = h.children[1]; if (s) s.classList.add('lbl'); io.observe(h); });
-  cursor(); depth(); marquee(); tilt(); promises(); hero(stage);
+  depth(); tilt(); promises(); hero(stage);
   return { revealHero: () => { const h = $('.hero-copy h1'); h && h.classList.add('shown'); scramble($('.eyebrow .eb'), 900); } };
 }
