@@ -8,6 +8,9 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : 1 - Math.pow(1 - k, 3), easeIn = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * k;
 const back = k => { if (k <= 0) return 0; if (k >= 1) return 1; const c1 = 1.2, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
 const short = a => a ? a.slice(0, 4) + '…' + a.slice(-4) : '';
+// coin pictures: pump.fun coins come from pump.fun's own image CDN first, the listed link second; anything that fails hides quietly
+const pic = (mint, icon, lazy = true) => { const pf = /pump$/.test(mint || '') ? 'https://images.pump.fun/coin-image/' + mint + '?variant=86x86' : null, a = pf || icon, b = pf && icon && !/ipfs\.io\//.test(icon) ? icon : '';
+  return a ? `<img src="${esc(a)}" alt="" ${lazy ? 'loading="lazy"' : ''} referrerpolicy="no-referrer" data-alt="${esc(b)}" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=''}else{this.style.visibility='hidden'}">` : '<img alt="">'; };
 const usd = v => v == null ? '—' : v >= 1e9 ? '$' + (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? '$' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(1) + 'K' : '$' + v.toFixed(0);
 
 // ---------- the stage and the intro ----------
@@ -309,7 +312,7 @@ function render(j) {
   const lv = rows.some(r => r[0] === 'bad') ? 'bad' : rows.some(r => r[0] === 'warn') ? 'warn' : 'ok';
   const V = { ok: 'CLEAN', warn: 'CAUTION', bad: 'CONTROLLED' }[lv];
   const tk = j.token || {}, prog = j.program === 'spl-token-2022' ? 'Token-2022' : j.program === 'spl-token' ? 'SPL Token (classic)' : j.program;
-  return `<div class="verdict">${tk.icon ? `<img src="${esc(tk.icon)}" alt="" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : '<img alt="">'}<div><div class="vn">${esc(tk.name || 'Unnamed token')}${tk.symbol ? ' · $' + esc(tk.symbol) : ''}</div><div class="vm">${esc(j.mint)}</div></div><span class="vbadge ${lv}">${V}</span></div>
+  return `<div class="verdict">${pic(j.mint, tk.icon, false)}<div><div class="vn">${esc(tk.name || 'Unnamed token')}${tk.symbol ? ' · $' + esc(tk.symbol) : ''}</div><div class="vm">${esc(j.mint)}</div></div><span class="vbadge ${lv}">${V}</span></div>
     <div class="facts"><div><small>program</small><b>${esc(prog)}</b></div><div><small>extensions</small><b>${ext.length}</b></div><div><small>supply</small><b>${j.uiSupply != null ? Number(j.uiSupply).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—'}</b></div><div><small>market cap</small><b>${usd(tk.mcap)}</b></div></div>
     <div class="exts">${rows.map(([l, n, dsc]) => `<div class="ext"><span class="ic ${l}">${IC[l]}</span><span class="en">${esc(n)}</span><span class="ed">${dsc}</span></div>`).join('')}</div>
     <p class="dim" style="font-size:12.5px;margin-top:10px">Read from the mint account on Solana mainnet just now${j.slot ? ` (slot ${j.slot.toLocaleString('en-US')})` : ''}. CONTROLLED means someone other than you can move, block or freeze holders' tokens.</p>`;
@@ -327,7 +330,7 @@ $$('#examples button').forEach(b => b.onclick = () => inspect(b.dataset.m));
   try {
     const j = await (await fetch('/api/board')).json(); const L = j.tokens || [];
     $('#boardMeta').textContent = L.length ? `${L.length} found among Jupiter's trending and top tokens · ${new Date().toLocaleTimeString()}` : 'none right now among Jupiter\'s trending lists';
-    $('#board').innerHTML = L.length ? L.map(t => `<div class="bi" data-m="${esc(t.mint)}">${t.icon ? `<img src="${esc(t.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : '<img alt="">'}<div><b>${esc(t.symbol ? '$' + t.symbol : t.name || short(t.mint))}</b><small>${esc(t.name || '')} · ${usd(t.mcap)}</small></div><span class="x">${esc((t.tags || []).slice(0, 2).join(' · ') || 'token-2022')}</span></div>`).join('') : '<div class="empty">No Token-2022 coins in Jupiter\'s trending lists right now.</div>';
+    $('#board').innerHTML = L.length ? L.map(t => `<div class="bi" data-m="${esc(t.mint)}">${pic(t.mint, t.icon)}<div><b>${esc(t.symbol ? '$' + t.symbol : t.name || short(t.mint))}</b><small>${esc(t.name || '')} · ${usd(t.mcap)}</small></div><span class="x">${esc((t.tags || []).slice(0, 2).join(' · ') || 'token-2022')}</span></div>`).join('') : '<div class="empty">No Token-2022 coins in Jupiter\'s trending lists right now.</div>';
     $$('#board .bi').forEach(b => b.onclick = () => { inspect(b.dataset.m); $('#inspect').scrollIntoView({ behavior: 'smooth' }); });
   } catch (e) { $('#boardMeta').textContent = 'offline: ' + e.message; }
 })();
@@ -377,7 +380,7 @@ $$('#examples button').forEach(b => b.onclick = () => inspect(b.dataset.m));
   const pct = v => v == null ? '' : `<span class="ch ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '▲' : '▼'} ${Math.abs(v) >= 100 ? Math.round(Math.abs(v)) : Math.abs(v).toFixed(1)}%</span>`;
   const ago = ms => { const s = Math.max(1, Math.round(ms / 1000)); return s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : s < 86400 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd'; };
   const chip = (t, fresh) => `<a class="tc" href="https://pump.fun/coin/${encodeURIComponent(t.mint)}" target="_blank" rel="noopener" title="${esc(t.name)} on pump.fun">`
-    + (t.icon ? `<img src="${esc(t.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'ph',textContent:'${esc((t.symbol || '?')[0].toUpperCase())}'}))">` : `<i class="ph">${esc((t.symbol || '?')[0].toUpperCase())}</i>`)
+    + (t.icon ? `<img src="${esc(t.icon)}" alt="" decoding="async" referrerpolicy="no-referrer" data-alt="${esc(t.alt || '')}" data-l="${esc((t.symbol || '?')[0].toUpperCase())}">` : `<i class="ph">${esc((t.symbol || '?')[0].toUpperCase())}</i>`)
     + `<span class="nm">${esc(t.name)}</span><span class="sy">$${esc(t.symbol)}</span>`
     + `<span class="mc">${t.mcap ? usd(t.mcap) : 'new'}</span>`
     + (fresh ? `<span class="ag" data-born="${t.born || ''}">${t.born ? ago(Date.now() - t.born) : ''}</span>` : pct(t.ch1h ?? t.ch5m))
@@ -389,6 +392,9 @@ $$('#examples button').forEach(b => b.onclick = () => inspect(b.dataset.m));
     const w1 = R.tr.scrollWidth; let reps = 1; while ((reps < 2 || R.tr.scrollWidth < vw + w1) && reps < 10) { R.tr.insertAdjacentHTML('beforeend', one); reps++; }
     R.w = (R.tr.scrollWidth + 8) / reps; R.off = R.off % (R.w || 1); R.reps = reps;
   }
+  // a picture that fails: try the second source, then the coin's letter
+  box.addEventListener('error', e => { const im = e.target; if (im.tagName !== 'IMG') return; if (im.dataset.alt) { const u = im.dataset.alt; im.dataset.alt = ''; im.src = u; return; }
+    const i = document.createElement('i'); i.className = 'ph'; i.textContent = im.dataset.l || '?'; im.replaceWith(i); }, true);
   let lastAt = 0;
   async function load() {
     try {
