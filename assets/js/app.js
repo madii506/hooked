@@ -12,28 +12,42 @@ const usd = v => v == null ? '—' : v >= 1e9 ? '$' + (v / 1e9).toFixed(2) + 'B'
 // ---------- the stage and the intro ----------
 const HERO_X = mob ? 0 : -3.9;
 const intro = html.classList.contains('intro');
-const stage = createStage($('#stage'), intro ? { hookY: 9, coinDrop: 40, seaOn: 0, camTarget: 0, camX: 0, lookY: 1.9, lookYs: 1.9 } : { camTarget: HERO_X, camX: HERO_X, autoDrip: true });
+const stage = createStage($('#stage'), intro ? { hookY: 14, coinDrop: 40, seaOn: 0, camTarget: HERO_X, camX: HERO_X, camPath: [0, 9, 34, 0, -1.5, 0] } : { camTarget: HERO_X, camX: HERO_X, autoDrip: true });
 const S = stage.S;
+// the intro: no words. The sea draws in, a line drops, the hook lowers on it, the camera circles it,
+// a coin falls into the bend, the camera looks closely at the rule stamped on it, then pulls back to the page.
+const smooth = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k);
+function camAt(K, t) {
+  if (t <= K[0][0]) return K[0][1];
+  for (let i = 0; i < K.length - 1; i++) { const [t0, a] = K[i], [t1, b] = K[i + 1]; if (t <= t1) { const k = smooth((t - t0) / (t1 - t0)); return a.map((v, j) => v + (b[j] - v) * k); } }
+  return K[K.length - 1][1];
+}
 function runIntro() {
-  const word = $('#iWord'), bar = $('.i-line i'), head = $('#iHead'), T0 = performance.now(), HEAD = 'ONE RULE IN EVERY TRANSFER.';
-  word.textContent = ''; let done = false, dripped = false;
+  const bar = $('.i-line i'), T0 = performance.now(), END = 10.4, R = 18.5, o = a => [Math.sin(a) * R, 1.2 + Math.abs(Math.sin(a)) * 1.6, Math.cos(a) * R];
+  const K = [
+    [0.0, [0, 9, 34, 0, -1.5, 0]], [1.8, [0, 3.4, 26, 0, .4, 0]], [3.9, [0, 1.4, 19.5, 0, .9, 0]],
+    [5.0, [...o(.75), 0, .7, 0]], [6.0, [...o(-.45), 0, .5, 0]],
+    [7.1, [1.1, -.05, 5.6, 0, -.22, 0]], [7.9, [.7, -.1, 5.2, 0, -.22, 0]],
+    [END - .4, [HERO_X, .9, 18.5, HERO_X, 1.05, 0]],
+  ];
+  let done = false, dripped = false, d2 = false, d3 = false;
   const finish = () => {
-    if (done) return; done = true; S.hookY = 0; S.coinDrop = 0; S.seaOn = 1; S.camTarget = HERO_X; S.lookY = 1.05; S.autoDrip = true;
+    if (done) return; done = true; S.camPath = null; S.camX = HERO_X; S.hookY = 0; S.coinDrop = 0; S.seaOn = 1; S.camTarget = HERO_X; S.lookY = S.lookYs = 1.05; S.autoDrip = true;
     $('#intro').classList.add('out'); html.classList.remove('intro'); setTimeout(() => $('#intro').remove(), 900);
     setTimeout(() => $$('.tag').forEach(t => t.classList.add('on')), 900); setTimeout(() => FX.revealHero(), 250);
   };
   $('#iSkip').onclick = finish; addEventListener('keydown', e => { if (e.key === 'Escape' || e.key === 'Enter') finish(); }, { once: true });
   const step = () => {
     if (done) return; const t = (performance.now() - T0) / 1000;
-    word.textContent = 'HOOKED'.slice(0, Math.floor(t / .07));
-    bar.style.transform = `scaleX(${Math.min(1, t / 5.2)})`;
-    S.hookY = 9 * (1 - back((t - .5) / 1.9));
-    S.seaOn = ease((t - .3) / 1.6);
-    S.coinDrop = t < 2.45 ? 40 : 7 * (1 - easeIn((t - 2.45) / .6)) + (t > 3.05 ? -.06 * Math.sin((t - 3.05) * 14) * Math.exp(-(t - 3.05) * 5) : 0);
-    if (!dripped && t > 3.05) { dripped = true; stage.drip(0, 0, .32); }
-    if (t > 3.3) { const n = Math.min(HEAD.length, Math.floor((t - 3.3) / .045)); head.innerHTML = esc(HEAD.slice(0, n)) + '<span class="cur"></span>'; }
-    if (t > 5.4) { head.style.transition = 'opacity .6s'; head.style.opacity = 0; }
-    if (t > 5.6) return finish();
+    bar.style.transform = `scaleX(${Math.min(1, t / END)})`;
+    S.camPath = camAt(K, t);
+    S.seaOn = ease(t / 2.2);
+    S.hookY = 14 * (1 - back((t - 1.6) / 2.4));
+    S.coinDrop = t < 5.1 ? 40 : 7 * (1 - easeIn((t - 5.1) / .62)) + (t > 5.72 ? -.07 * Math.sin((t - 5.72) * 14) * Math.exp(-(t - 5.72) * 5) : 0);
+    if (!d2 && t > 3.9) { d2 = true; stage.drip(0, 0, .12); }
+    if (!dripped && t > 5.72) { dripped = true; stage.drip(0, 0, .34); }
+    if (!d3 && t > 8.6) { d3 = true; stage.drip(0, 0, .18); }
+    if (t > END) return finish();
     requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
@@ -71,13 +85,16 @@ $$('.rv').forEach(el => rvIO.observe(el));
 (function pipeline() {
   const svg = $('#pipeSvg'), NS = 'http://www.w3.org/2000/svg';
   const el = (n, a, p = svg) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
-  const box = (x, y, w, h, t1, t2, dark) => { el('rect', { x, y, width: w, height: h, rx: 14, fill: dark ? '#111' : '#eeeeec', stroke: '#111', 'stroke-width': 1.2 });
-    const a = el('text', { x: x + w / 2, y: y + h / 2 - 4, 'text-anchor': 'middle', 'font-family': 'JBM, monospace', 'font-size': 13, 'font-weight': 800, 'letter-spacing': 1.5, fill: dark ? '#fff' : '#111' }); a.textContent = t1;
-    const b = el('text', { x: x + w / 2, y: y + h / 2 + 15, 'text-anchor': 'middle', 'font-family': 'JBM, monospace', 'font-size': 10.5, 'letter-spacing': 1, fill: dark ? '#aaa' : '#767676' }); b.textContent = t2; };
+  const nodes = [];
+  const box = (x, y, w, h, t1, t2, dark, id) => { const g0 = el('g', { class: 'node', 'data-n': id }); nodes.push(g0);
+    el('rect', { x, y, width: w, height: h, rx: 14, fill: dark ? '#111' : '#eeeeec', stroke: '#111', 'stroke-width': 1.2 }, g0);
+    const a = el('text', { x: x + w / 2, y: y + h / 2 - 4, 'text-anchor': 'middle', 'font-family': 'JBM, monospace', 'font-size': 13, 'font-weight': 800, 'letter-spacing': 1.5, fill: dark ? '#fff' : '#111' }, g0); a.textContent = t1;
+    const b = el('text', { x: x + w / 2, y: y + h / 2 + 15, 'text-anchor': 'middle', 'font-family': 'JBM, monospace', 'font-size': 10.5, 'letter-spacing': 1, fill: dark ? '#aaa' : '#767676' }, g0); b.textContent = t2; };
   const path = (d, dash) => el('path', { d, fill: 'none', stroke: '#111', 'stroke-width': 1.2, 'stroke-dasharray': dash || '3 5', opacity: .55 });
   path('M150 150 H 330'); path('M500 150 H 620'); path('M800 150 C 860 150 860 70 920 70'); path('M800 150 C 860 150 860 230 920 230');
-  box(20, 110, 130, 80, 'WALLET', 'buy · sell · send'); box(330, 110, 170, 80, 'TOKEN-2022', 'transfer instruction'); box(620, 100, 180, 100, 'HOOK', 'max_buy(1%)', true);
-  box(920, 40, 160, 60, '✓ LANDS', 'inside the rule'); box(920, 200, 160, 60, '✕ REVERTS', 'nothing moves');
+  box(20, 110, 130, 80, 'WALLET', 'buy · sell · send', false, 0); box(330, 110, 170, 80, 'TOKEN-2022', 'transfer instruction', false, 1); box(620, 100, 180, 100, 'HOOK', 'max_buy(1%)', true, 2);
+  box(920, 40, 160, 60, '✓ LANDS', 'inside the rule', false, 3); box(920, 200, 160, 60, '✕ REVERTS', 'nothing moves', false, 3);
+  window.__pipeStep = i => nodes.forEach(n => { const on = i == null || +n.dataset.n === i; n.classList.toggle('on', i != null && on); n.classList.toggle('dim', !on); });
   const lbl = el('text', { x: 710, y: 228, 'text-anchor': 'middle', 'font-family': 'JBM, monospace', 'font-size': 10.5, fill: '#767676', 'letter-spacing': 1 }); lbl.textContent = 'checks every transfer';
   const pts = []; const g = el('g', {});
   const along = (d, k) => { const p = el('path', { d, fill: 'none' }, g); const L = p.getTotalLength(), q = p.getPointAtLength(L * k); p.remove(); return q; };
@@ -101,23 +118,17 @@ $$('.rv').forEach(el => rvIO.observe(el));
 
 // ---------- 03 the rule cards, each with a small live drawing ----------
 const RULES = [
-  { id: 'maxbuy', k: 'ANTI-SNIPER', name: 'MAX BUY', d: 'No single buy bigger than a share of supply while the launch is young. Snipers and bundles can\'t take half the supply in the first block.', stops: 'snipers · bundles' },
-  { id: 'maxwallet', k: 'ANTI-WHALE', name: 'MAX WALLET', d: 'No wallet can hold more than a share of supply until the date you set. A buy that would push a wallet over the cap reverts.', stops: 'whales · concentration' },
-  { id: 'cooldown', k: 'ANTI-BOT', name: 'BUY COOLDOWN', d: 'One buy per wallet every few seconds for the first hour. Bots that spam buys block by block get stopped.', stops: 'bots · spam buys' },
-  { id: 'devlock', k: 'ANTI-DUMP', name: 'DEV LOCK', d: 'The creator\'s own tokens can\'t move until the lock ends. Not a promise in a tweet: the transfer simply fails.', stops: 'dev dumps' },
+  { id: 'maxbuy', k: 'ANTI-SNIPER', name: 'MAX BUY', d: 'No single buy bigger than a share of supply while the launch is young. Snipers and bundles can\'t take half the supply in the first block.', stops: ['snipers in block one', 'bundled wallets', 'one wallet taking the curve'], params: [['cap', '1% of supply'], ['window', 'first 10 min'], ['sunset', 'your choice']], cant: ['block a sell', 'outlive its window'],
+    code: '<span class="k">if</span> now &lt; launch + window {\n    require!(amount &lt;= supply * cap)   <span class="c">// over it: reverts</span>\n}' },
+  { id: 'maxwallet', k: 'ANTI-WHALE', name: 'MAX WALLET', d: 'No wallet can hold more than a share of supply until the date you set. A buy that would push a wallet over the cap reverts.', stops: ['whales cornering supply', 'one wallet setting the price', 'slow accumulation'], params: [['cap', '2% per wallet'], ['until', 'day 7'], ['sunset', 'your choice']], cant: ['shrink a wallet', 'block a sell'],
+    code: '<span class="k">if</span> now &lt; until {\n    require!(dest_balance &lt;= supply * cap)   <span class="c">// after the transfer</span>\n}' },
+  { id: 'cooldown', k: 'ANTI-BOT', name: 'BUY COOLDOWN', d: 'One buy per wallet every few seconds for the first hour. Bots that spam buys block by block get stopped.', stops: ['buy-spam bots', 'block-by-block laddering', 'volume bots in hour one'], params: [['gap', '30 seconds'], ['window', 'first hour'], ['sunset', 'your choice']], cant: ['slow a normal buyer', 'block a sell'],
+    code: '<span class="k">if</span> now &lt; launch + window {\n    require!(now - last_buy[owner] &gt;= gap)\n    last_buy[owner] = now\n}' },
+  { id: 'devlock', k: 'ANTI-DUMP', name: 'DEV LOCK', d: 'The creator\'s own tokens can\'t move until the lock ends. Not a promise in a tweet: the transfer simply fails.', stops: ['the creator dumping', 'a dev bag moved to a new wallet', 'rug by selling into buyers'], params: [['wallet', 'the creator'], ['lock', '30 days'], ['sunset', 'the lock end']], cant: ['touch anyone else', 'extend itself'],
+    code: '<span class="k">if</span> source_owner == creator {\n    require!(now &gt;= unlock_at)   <span class="c">// locked until then</span>\n}' },
 ];
-(function cards() {
-  $('#ruleCards').innerHTML = RULES.map((r, i) => `<div class="rule rv${i ? ' d' + Math.min(2, i) : ''}"><canvas data-r="${r.id}"></canvas><div class="rk">${r.k}</div><h3>${r.name}</h3><p>${r.d}</p><div class="stops">STOPS <span>· ${r.stops}</span></div></div>`).join('');
-  $$('#ruleCards .rv').forEach(el => rvIO.observe(el));
-  const cvs = $$('#ruleCards canvas');
-  const draw = now => {
-    requestAnimationFrame(draw);
-    for (const c of cvs) {
-      const r = c.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) continue;
-      const d = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(r.width * d)) { c.width = r.width * d; c.height = r.height * d; }
-      const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); const W = r.width, H = r.height, t = now / 1000; x.clearRect(0, 0, W, H);
-      x.lineWidth = 1; x.font = '600 9.5px JBM, monospace'; x.textBaseline = 'middle';
-      const kind = c.dataset.r, base = H - 18;
+function drawRule(x, W, H, t, kind) {
+      const base = H - 18;
       x.strokeStyle = 'rgba(17,17,17,.25)'; x.beginPath(); x.moveTo(12, base); x.lineTo(W - 12, base); x.stroke();
       if (kind === 'maxbuy') {
         const cap = base - (H - 40) * .45; x.setLineDash([3, 4]); x.strokeStyle = '#111'; x.beginPath(); x.moveTo(12, cap); x.lineTo(W - 12, cap); x.stroke(); x.setLineDash([]);
@@ -146,9 +157,48 @@ const RULES = [
         [.14, .30, .46].forEach((f, k) => { const ax = 12 + (W - 24) * f, y = 56 + (k % 2) * 22; if (ax > nx) return; x.strokeStyle = '#c23a2b'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(ax - 4, y - 4); x.lineTo(ax + 4, y + 4); x.moveTo(ax - 4, y + 4); x.lineTo(ax + 4, y - 4); x.stroke(); x.lineWidth = 1; x.fillStyle = '#c23a2b'; x.fillText('SELL', ax + 8, y); });
         [.80].forEach(f => { const ax = 12 + (W - 24) * f, y = 66; if (ax > nx) return; x.fillStyle = '#111'; x.beginPath(); x.arc(ax, y, 3.5, 0, 7); x.fill(); x.fillText('SELL', ax + 8, y); });
       }
-    }
-  };
-  requestAnimationFrame(draw);
+}
+(function rules() {
+  let cur = 0, t0 = performance.now(), hold = false; const DUR = 7000;
+  $('#rTabs').innerHTML = RULES.map((r, i) => `<button type="button" class="rtab" data-i="${i}"><span class="i">0${i + 1}</span><span><b>${r.name}</b><span>${r.k}</span></span><em>${r.params[0][1]}</em></button>`).join('');
+  $$('.rtab').forEach(b => b.onclick = () => set(+b.dataset.i));
+  [$('#rDet'), $('#rTabs')].forEach(el => { el.addEventListener('pointerenter', () => hold = true); el.addEventListener('pointerleave', () => { hold = false; t0 = performance.now() - (performance.now() - t0); }); });
+  function set(i) {
+    cur = i; t0 = performance.now(); const r = RULES[i];
+    $$('.rtab').forEach((b, k) => b.classList.toggle('on', k === i));
+    $('#rTag').textContent = `RULE 0${i + 1} · ${r.k}`; $('#rK').textContent = r.k; $('#rName').textContent = r.name; $('#rDesc').textContent = r.d;
+    $('#rStops').innerHTML = r.stops.map(x => `<li>${esc(x)}</li>`).join(''); $('#rCant').innerHTML = r.cant.map(x => `<li>${esc(x)}</li>`).join('');
+    $('#rParams').innerHTML = r.params.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join(''); $('#rCode').innerHTML = r.code;
+    const d = $('#rDet'); d.classList.remove('swap'); void d.offsetWidth; d.classList.add('swap');
+  }
+  set(0);
+  const c = $('#rCv'), x = c.getContext('2d'); let vis = false; new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(c);
+  let paused = 0, last = performance.now();
+  const f = now => { requestAnimationFrame(f); const dt = now - last; last = now; if (!vis) return;
+    if (hold) t0 += dt; else if (now - t0 > DUR) set((cur + 1) % RULES.length);
+    $('#rProg').style.width = Math.min(100, (now - t0) / DUR * 100) + '%';
+    const r = c.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(r.width * d)) { c.width = r.width * d; c.height = r.height * d; }
+    x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, r.width, r.height);
+    x.save(); x.translate(40, 34); drawRule(x, r.width - 80, r.height - 58, now / 1000, RULES[cur].id); x.restore(); };
+  requestAnimationFrame(f);
+})();
+
+// ---------- 01 the launch timeline: when each threat hits, when each rule is on ----------
+(function timeline() {
+  const T = [0, 60, 600, 3600, 86400, 604800, 2592000], LAB = ['0', '1m', '10m', '1h', '1d', '7d', '30d'];
+  const X = sec => { if (sec <= 0) return 0; for (let i = 0; i < T.length - 1; i++) if (sec <= T[i + 1]) { const a = i === 0 ? 0 : Math.log(T[i]), b = Math.log(T[i + 1]), v = i === 0 ? sec / T[1] : (Math.log(sec) - a) / (b - a); return (i + v) / 6 * 100; } return 100; };
+  $('#tlAxis').innerHTML = LAB.map((l, i) => `<span style="left:${i / 6 * 100}%">${l}</span>`).join('');
+  const ROWS = [['SNIPERS', 'buy the curve in block one', [0, 120], [0, 600], 'MAX BUY · 10 MIN'], ['BOTS', 'spam buys, block after block', [0, 3600], [0, 3600], 'BUY COOLDOWN · 1 H'], ['WHALES', 'corner the supply', [600, 604800], [0, 604800], 'MAX WALLET · 7 D'], ['DEV DUMP', 'sells the creator bag', [3600, 2592000], [0, 2592000], 'DEV LOCK · 30 D']];
+  $('#tlRows').innerHTML = ROWS.map(([n, d, th, ru, rl], i) => `<div class="tl-row"><div class="tl-lab"><b>${n}</b><span>${d}</span></div><div class="tl-track"><i class="tl-threat" style="left:${X(th[0])}%;width:${X(th[1]) - X(th[0])}%;transition-delay:${.15 + i * .18}s"></i><i class="tl-rule" style="left:${X(ru[0])}%;width:${X(ru[1]) - X(ru[0])}%;transition-delay:${.9 + i * .22}s"><em>${rl}</em></i></div></div>`).join('');
+  new IntersectionObserver((es, io) => { if (es[0].isIntersecting) { $('#timeline').classList.add('go'); io.disconnect(); } }, { threshold: .35 }).observe($('#timeline'));
+})();
+
+// ---------- 02 the story: scrolling the steps lights the pipeline and the code ----------
+(function story() {
+  const set = i => { $$('#howSteps li').forEach(l => l.classList.toggle('on', +l.dataset.s === i)); $$('.st').forEach(s2 => s2.classList.toggle('on', +s2.dataset.s === i)); $$('#howCode .ln').forEach(l => l.classList.toggle('on', +l.dataset.s === i)); window.__pipeStep && window.__pipeStep(i); };
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) set(+e.target.dataset.s); }), { rootMargin: '-48% 0px -48% 0px' });
+  $$('.st').forEach(s2 => io.observe(s2)); $$('#howSteps li').forEach(l => l.onclick = () => { const st = $(`.st[data-s="${l.dataset.s}"]`); scrollTo({ top: st.getBoundingClientRect().top + scrollY - innerHeight * .4, behavior: 'smooth' }); });
+  set(0);
 })();
 
 // ---------- 04 the simulator ----------
@@ -164,7 +214,7 @@ const RULES = [
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   function reset() { ev = []; t0 = performance.now(); seed = 7; pass = fail = big = 0; wallets = {}; log.innerHTML = ''; stats(); }
   $('#simReset').onclick = reset;
-  function stats() { $('#sPass').textContent = pass; $('#sFail').textContent = fail; $('#sBig').textContent = big ? big.toFixed(2) + '%' : '—'; }
+  function stats() { $('#sPass').textContent = pass; $('#sFail').textContent = fail; $('#sBig').textContent = big ? big.toFixed(2) + '%' : '—'; $('#sShare').textContent = pass + fail ? Math.round(fail / (pass + fail) * 100) + '%' : '—'; }
   const LEN = 26;   // seconds of animation for one simulated launch
   function spawn(simMin) {   // a simulated transfer at minute simMin of the launch
     const early = simMin < 3, w = early && rnd() < .5 ? 'sniper' + Math.floor(rnd() * 4) : rnd() < .12 ? 'bot' + Math.floor(rnd() * 2) : 'w' + Math.floor(rnd() * 60);
@@ -178,7 +228,7 @@ const RULES = [
     if (ok) pass++; else { fail++; big = Math.max(big, amt); }
     ev.push({ simMin, amt, ok, w, side, at: performance.now() }); stats();
     const row = document.createElement('div'); row.className = ok ? 'ok' : 'no'; row.innerHTML = `<span>${esc(side)} ${amt.toFixed(2)}%${why ? ' · ' + esc(why) : ''}</span><b>${ok ? 'passed' : 'reverted'}</b>`;
-    log.prepend(row); while (log.children.length > 7) log.lastChild.remove();
+    log.prepend(row); while (log.children.length > 8) log.lastChild.remove();
   }
   let vis = false, nextAt = 0, seenOnce = false, hiddenAt = 0; new IntersectionObserver(e => { const v = e[0].isIntersecting; if (v && !seenOnce) { seenOnce = true; reset(); } if (!v && vis) hiddenAt = performance.now(); if (v && !vis && hiddenAt) { t0 += performance.now() - hiddenAt; ev.forEach(z => z.at += performance.now() - hiddenAt); } vis = v; }).observe(cv);
   function frame(now) {
@@ -188,7 +238,7 @@ const RULES = [
     const span = rule === 'devlock' ? 60 : 60, k = (now - t0) / 1000 / LEN, simNow = Math.min(span, k * span);
     if (k < 1 && now > nextAt) { nextAt = now + (simNow < 3 ? 90 : 260) + Math.random() * 120; spawn(simNow); }
     if (k > 1.25) reset();
-    const L = 54, R = W - (mob ? 20 : 300), T = 40, B = H - 46, X = m => L + (R - L) * m / span, Y = a => B - (B - T) * Math.min(1, a / 6);
+    const L = 54, R = W - 24, T = 40, B = H - 46, X = m => L + (R - L) * m / span, Y = a => B - (B - T) * Math.min(1, a / 6);
     x.font = '600 10px JBM, monospace'; x.fillStyle = '#767676'; x.strokeStyle = 'rgba(17,17,17,.12)'; x.lineWidth = 1;
     for (let m = 0; m <= span; m += 10) { x.beginPath(); x.moveTo(X(m), T); x.lineTo(X(m), B); x.stroke(); x.fillText(m + 'm', X(m) - 8, B + 18); }
     for (let a = 0; a <= 6; a += 1) { x.beginPath(); x.moveTo(L, Y(a)); x.lineTo(R, Y(a)); x.stroke(); x.fillText(a + '%', L - 30, Y(a) + 3); }
@@ -288,8 +338,10 @@ $$('#examples button').forEach(b => b.onclick = () => inspect(b.dataset.m));
     lines.push(k('[sunset]'), `after    = ${v(sun + (sun === '1' ? ' day' : ' days'))}  ${c('# then a plain token')}`, k('[never]'), `block_sells = ${v('false')}  ${c('# not possible on hooked')}`);
     $('#lBook').innerHTML = lines.join('\n');
     try { localStorage.setItem('hooked_rulebook', JSON.stringify({ L, name: $('#lName').value, sym: $('#lSym').value, sun })); } catch (e) {}
+    const st = [!!($('#lName').value.trim() && $('#lSym').value.trim()), RULES.some(r => L[r.id].on), true, $('#lState').classList.contains('on')];
+    const curStep = st.findIndex(v => !v); $$('#lSteps li').forEach((li, i) => { li.classList.toggle('done', st[i] && i !== 2); li.classList.toggle('on', i === (curStep < 0 ? 3 : curStep)); });
   }
-  book(); $('#lGo').onclick = () => $('#lState').classList.add('on');
+  book(); $('#lGo').onclick = () => { $('#lState').classList.add('on'); book(); };
 })();
 
 // ---------- the end: slow ripples ----------

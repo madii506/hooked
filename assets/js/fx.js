@@ -92,7 +92,7 @@ function marquee() {
 // ---------- cards tilt toward the pointer; buttons pull toward it ----------
 function tilt() {
   if (!FINE || RM) return;
-  $$('.card, .rule, .vs-col').forEach(el => {
+  $$('.vs-col, .rtab, .bi').forEach(el => {
     el.classList.add('tilt');
     el.addEventListener('pointermove', e => { const r = el.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
       el.style.setProperty('--rx', ((.5 - py) * 7).toFixed(2) + 'deg'); el.style.setProperty('--ry', ((px - .5) * 9).toFixed(2) + 'deg'); el.style.setProperty('--gx', (px * 100) + '%'); el.style.setProperty('--gy', (py * 100) + '%'); });

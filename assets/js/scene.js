@@ -150,8 +150,9 @@ export function createStage(canvas, opts = {}) {
     hook.group.rotation.x = .04 * Math.sin(S.t * .7) * sw - S.smy * .06;
     // the coin drops into the bend (intro), then sits
     hook.coin.position.y = -.2 + S.coinDrop; hook.coin.rotation.z = .02 + S.coinDrop * .8;
-    cam.position.set(S.camX + S.smx * .6, .9 - S.smy * .35, 18.5);
-    S.lookYs += (S.lookY - S.lookYs) * Math.min(1, dt * 1.6); cam.lookAt(S.camX + S.look.x, S.lookYs, 0);
+    if (S.camPath) { const c = S.camPath; cam.position.set(c[0] + S.smx * .25, c[1] - S.smy * .15, c[2]); cam.lookAt(c[3], c[4], c[5]); }
+    else { cam.position.set(S.camX + S.smx * .6, .9 - S.smy * .35, 18.5);
+      S.lookYs += (S.lookY - S.lookYs) * Math.min(1, dt * 1.6); cam.lookAt(S.camX + S.look.x, S.lookYs, 0); }
     uni.uTime.value = S.t; uni.uOpacity.value = .5 * S.seaOn;
     rings.forEach(r => { const a = S.t - r.userData.t0; if (a < 0 || a > 5) { r.material.opacity = 0; return; } const s = .3 + a * 1.9; r.scale.set(s, 1, s); r.material.opacity = .5 * (1 - a / 5) * S.seaOn; });
     auto += dt; if (S.autoDrip && auto > 4.2) { auto = 0; drip(0, 0, .16); }
